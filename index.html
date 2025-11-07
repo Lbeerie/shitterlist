@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MraiTilities Shitter List</title>
+  <meta name="description" content="Search and browse the public Shitter List backed by Firebase Realtime Database.">
+  <style>
+    :root{
+      --bg:#0f1220;--panel:#161a2b;--muted:#a6accd;--text:#e6e9ff;--accent:#7c9cf5;--danger:#ff6b6b;--ok:#7ee787;
+      --border: #262b45;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,"Helvetica Neue",Arial,"Apple Color Emoji","Segoe UI Emoji";background:var(--bg);color:var(--text);}
+    header{padding:24px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:linear-gradient(180deg, rgba(15,18,32,0.98), rgba(15,18,32,0.92));backdrop-filter: saturate(140%) blur(6px);z-index:3}
+    .container{max-width:980px;margin:0 auto;padding:0 16px}
+    h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.3px}
+    .sub{color:var(--muted);font-size:13px;margin-top:6px}
+    .searchbar{display:flex;gap:10px;margin:16px 0 0}
+    input[type="search"]{flex:1;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text);outline:none}
+    input[type="search"]::placeholder{color:#7b80a8}
+    .pill{border-radius:999px;border:1px solid var(--border);padding:8px 12px;background:var(--panel);font-size:12px;color:var(--muted)}
+    main{padding:24px 16px}
+    .grid{display:grid;grid-template-columns:1.2fr 2fr 1.2fr 1fr;gap:10px;align-items:center}
+    .thead{position:sticky;top:74px;background:var(--bg);padding:10px 12px;border-bottom:1px solid var(--border);z-index:2}
+    .thead div{color:#9aa0c6;font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+    .row{padding:12px;border-bottom:1px solid var(--border)}
+    .tag{display:inline-flex;align-items:center;gap:6px;background:#14162a;border:1px solid var(--border);color:#b7bdf0;padding:4px 8px;border-radius:999px;font-size:12px}
+    .muted{color:var(--muted)}
+    .empty{padding:32px;text-align:center;color:var(--muted)}
+    .footer{padding:24px 16px;border-top:1px solid var(--border);color:var(--muted);font-size:12px}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+    .btn{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
+    .btn:hover{border-color:#2e355a}
+    .count{font-size:12px;color:var(--muted)}
+    .badge-ok{color:var(--ok)}
+    .nowrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    @media (max-width:800px){
+      .grid{grid-template-columns:1.2fr 1.6fr .8fr .9fr}
+      .thead{top:126px}
+      header .searchbar{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="container">
+    <h1>MraiTilities Shitter List</h1>
+    <div class="sub">Public lookup. Type a Minecraft username or part of it. Data is fetched from Firebase Realtime Database.</div>
+    <div class="searchbar">
+      <input id="q" type="search" placeholder="Search IGN e.g. NotMrai" autofocus>
+      <div class="pill"><span id="status">Ready</span></div>
+    </div>
+    <div class="controls">
+      <div class="count"><span id="total">0</span> total · <span id="visible">0</span> shown</div>
+      <button class="btn" id="refreshBtn" title="Refetch from Firebase">Refresh</button>
+      <button class="btn" id="copyLinkBtn" title="Copy a link to this search">Copy link</button>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <div class="thead grid">
+    <div>IGN</div>
+    <div>Reason</div>
+    <div>Submitter</div>
+    <div>Date</div>
+  </div>
+  <div id="list"></div>
+  <div id="empty" class="empty" style="display:none">No matches. Try a different search.</div>
+</main>
+
+<div class="footer container">
+  Data source: <code id="dburl"></code> · This site is static — no auth, no cookies.  
+  Host anywhere (GitHub Pages / Netlify / Vercel). Built for CatGirlMrai 💜
+</div>
+
+<script>
+(function(){
+  // ====== CONFIG (edit these if needed) ======
+  const DB_URL = "https://mraitilities-default-rtdb.firebaseio.com/shitters.json"; // << change if your path changes
+  const DATE_FMT = new Intl.DateTimeFormat(undefined, { year:'numeric', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+
+  // ====== DOM ======
+  const qEl = document.getElementById('q');
+  const listEl = document.getElementById('list');
+  const emptyEl = document.getElementById('empty');
+  const statusEl = document.getElementById('status');
+  const totalEl = document.getElementById('total');
+  const visibleEl = document.getElementById('visible');
+  const dbUrlEl = document.getElementById('dburl');
+  dbUrlEl.textContent = DB_URL;
+
+  const refreshBtn = document.getElementById('refreshBtn');
+  const copyLinkBtn = document.getElementById('copyLinkBtn');
+
+  // ====== State ======
+  let raw = {};      // { key: { ign, reason, submitter, timestamp, ... } }
+  let rows = [];     // normalized array
+  let filtered = []; // filtered by query
+
+  // ====== Utils ======
+  function normalize(obj){
+    const out = [];
+    if (!obj || typeof obj !== 'object') return out;
+    for (const [id, v] of Object.entries(obj)) {
+      if (!v || typeof v !== 'object') continue;
+      const ign = String(v.ign || v.name || id).trim();
+      const reason = String(v.reason || v.msg || '').trim();
+      const submitter = String(v.submitter || v.sender || v.by || '').trim();
+      const ts = v.timestamp || v.time || v.date || null;
+      const date = ts ? new Date(ts) : null;
+      out.push({ id, ign, reason, submitter, ts: date ? date.getTime() : 0, date });
+    }
+    return out.sort((a,b)=> b.ts - a.ts || a.ign.localeCompare(b.ign));
+  }
+
+  function htmlRow(r){
+    const date = r.date ? DATE_FMT.format(r.date) : '—';
+    return `<div class="row grid">
+      <div class="nowrap"><span class="tag">${escapeHtml(r.ign)}</span></div>
+      <div>${escapeHtml(r.reason || "—")}</div>
+      <div class="nowrap muted">${escapeHtml(r.submitter || "—")}</div>
+      <div class="nowrap">${date}</div>
+    </div>`;
+  }
+
+  function render(){
+    totalEl.textContent = rows.length;
+    const q = (qEl.value || "").trim().toLowerCase();
+    if (!q) {
+      filtered = rows;
+    } else {
+      filtered = rows.filter(r => r.ign.toLowerCase().includes(q) || (r.reason||"").toLowerCase().includes(q));
+    }
+    visibleEl.textContent = filtered.length;
+
+    if (!filtered.length){
+      listEl.innerHTML = "";
+      emptyEl.style.display = "";
+      return;
+    }
+    emptyEl.style.display = "none";
+    // Avoid huge reflow; build one big string
+    listEl.innerHTML = filtered.map(htmlRow).join("");
+  }
+
+  function setStatus(msg){ statusEl.textContent = msg; }
+
+  async function fetchData(){
+    setStatus("Loading...");
+    try{
+      const res = await fetch(DB_URL, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      raw = data || {};
+      rows = normalize(raw);
+      setStatus(`OK · ${rows.length} loaded`);
+      render();
+    } catch (e){
+      console.error(e);
+      setStatus("Error");
+      listEl.innerHTML = "";
+      emptyEl.style.display = "";
+      emptyEl.textContent = "Failed to fetch data. Check database URL & rules.";
+      totalEl.textContent = "0";
+      visibleEl.textContent = "0";
+    }
+  }
+
+  function debounce(fn, ms){
+    let t; return (...args)=>{ clearTimeout(t); t = setTimeout(()=>fn.apply(null,args), ms); };
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+
+  // Deep-link ?q=IGN
+  function applyQueryFromURL(){
+    const u = new URL(location.href);
+    const q = u.searchParams.get("q");
+    if (q) qEl.value = q;
+  }
+  function copyLink(){
+    const u = new URL(location.href);
+    const q = (qEl.value || "").trim();
+    if (q) u.searchParams.set("q", q); else u.searchParams.delete("q");
+    navigator.clipboard.writeText(u.toString()).then(()=>{
+      setStatus("Link copied");
+      setTimeout(()=>setStatus("OK"), 1200);
+    });
+  }
+
+  // Events
+  qEl.addEventListener("input", debounce(render, 120));
+  refreshBtn.addEventListener("click", fetchData);
+  copyLinkBtn.addEventListener("click", copyLink);
+
+  // Init
+  applyQueryFromURL();
+  fetchData();
+})();
+</script>
+</body>
+</html>
