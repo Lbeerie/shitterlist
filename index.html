@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>mraitilities Shitter List</title>
-  <meta name="description" content="Search and browse the public shitter List.">
+  <meta name="description" content="Search and browse the public Shitter List backed by Firebase Realtime Database.">
   <style>
     :root{
       --bg:#0f1220;--panel:#161a2b;--muted:#a6accd;--text:#e6e9ff;--accent:#7c9cf5;--danger:#ff6b6b;--ok:#7ee787;
@@ -47,14 +47,14 @@
 <header>
   <div class="container">
     <h1>mraitilities Shitter List</h1>
-    <div class="sub">Public lookup. Search for a username or part of it.</div>
+    <div class="sub">Type a Minecraft username or part of it to search.</div>
     <div class="searchbar">
-      <input id="q" type="search" placeholder="Search IGN e.g. AscentPVP" autofocus>
+      <input id="q" type="search" placeholder="Search IGN e.g. AscentPvP" autofocus>
       <div class="pill"><span id="status">Ready</span></div>
     </div>
     <div class="controls">
       <div class="count"><span id="total">0</span> total · <span id="visible">0</span> shown</div>
-      <button class="btn" id="refreshBtn" title="Refetch from the shitter list">Refresh</button>
+      <button class="btn" id="refreshBtn" title="Refetch from the database">Refresh</button>
       <button class="btn" id="copyLinkBtn" title="Copy a link to this search">Copy link</button>
     </div>
   </div>
@@ -72,16 +72,13 @@
 </main>
 
 <div class="footer container">
-  Data source: <code id="dburl"></code> · by mrai
+  Data source: <code id="dburl"></code> · by mrai.
 </div>
 
 <script>
 (function(){
-  // ====== CONFIG (edit these if needed) ======
   const DB_URL = "https://mraitilities-default-rtdb.firebaseio.com/shitters.json"; // << change if your path changes
   const DATE_FMT = new Intl.DateTimeFormat(undefined, { year:'numeric', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit'});
-
-  // ====== DOM ======
   const qEl = document.getElementById('q');
   const listEl = document.getElementById('list');
   const emptyEl = document.getElementById('empty');
@@ -93,13 +90,9 @@
 
   const refreshBtn = document.getElementById('refreshBtn');
   const copyLinkBtn = document.getElementById('copyLinkBtn');
-
-  // ====== State ======
-  let raw = {};      // { key: { ign, reason, submitter, timestamp, ... } }
-  let rows = [];     // normalized array
-  let filtered = []; // filtered by query
-
-  // ====== Utils ======
+  let raw = {};      
+  let rows = [];     
+  let filtered = []; 
   function normalize(obj){
     const out = [];
     if (!obj || typeof obj !== 'object') return out;
@@ -141,7 +134,7 @@
       return;
     }
     emptyEl.style.display = "none";
-    // Avoid huge reflow; build one big string
+
     listEl.innerHTML = filtered.map(htmlRow).join("");
   }
 
@@ -176,7 +169,6 @@
     return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   }
 
-  // Deep-link ?q=IGN
   function applyQueryFromURL(){
     const u = new URL(location.href);
     const q = u.searchParams.get("q");
