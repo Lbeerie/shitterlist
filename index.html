@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MraiTilities Shitter List</title>
-  <meta name="description" content="Search and browse the public Shitter List backed by Firebase Realtime Database.">
+  <title>mraitilities Shitter List</title>
+  <meta name="description" content="Search and browse the public shitter List.">
   <style>
     :root{
       --bg:#0f1220;--panel:#161a2b;--muted:#a6accd;--text:#e6e9ff;--accent:#7c9cf5;--danger:#ff6b6b;--ok:#7ee787;
@@ -46,15 +46,15 @@
 <body>
 <header>
   <div class="container">
-    <h1>MraiTilities Shitter List</h1>
-    <div class="sub">Public lookup. Type a Minecraft username or part of it. Data is fetched from Firebase Realtime Database.</div>
+    <h1>mraitilities Shitter List</h1>
+    <div class="sub">Public lookup. Search for a username or part of it.</div>
     <div class="searchbar">
-      <input id="q" type="search" placeholder="Search IGN e.g. NotMrai" autofocus>
+      <input id="q" type="search" placeholder="Search IGN e.g. AscentPVP" autofocus>
       <div class="pill"><span id="status">Ready</span></div>
     </div>
     <div class="controls">
       <div class="count"><span id="total">0</span> total · <span id="visible">0</span> shown</div>
-      <button class="btn" id="refreshBtn" title="Refetch from Firebase">Refresh</button>
+      <button class="btn" id="refreshBtn" title="Refetch from the shitter list">Refresh</button>
       <button class="btn" id="copyLinkBtn" title="Copy a link to this search">Copy link</button>
     </div>
   </div>
@@ -72,8 +72,8 @@
 </main>
 
 <div class="footer container">
-  Data source: <code id="dburl"></code> · This site is static — no auth, no cookies.  
-  Host anywhere (GitHub Pages / Netlify / Vercel). Built for CatGirlMrai 💜
+  Data source: <code id="dburl"></code> · This site is for the shitter list by mrai.
+  Hosted on Github Pages, powered by Firebase. by mrai.
 </div>
 
 <script>
